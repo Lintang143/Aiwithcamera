@@ -3,138 +3,107 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Budi - Anti Error Edition</title>
+    <title>Budi - Debug Mode</title>
     <style>
-        body { font-family: sans-serif; background: #111; color: #eee; text-align: center; padding: 20px; }
-        #video { width: 100%; max-width: 400px; border-radius: 10px; border: 2px solid #333; }
-        #chat { width: 100%; max-width: 400px; height: 300px; overflow-y: auto; background: #222; margin: 10px auto; padding: 10px; border-radius: 10px; text-align: left; }
-        button { padding: 10px 20px; margin: 5px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 5px; }
-        button:disabled { background: #555; }
-        .msg { margin: 5px 0; padding: 8px; border-radius: 5px; }
-        .user { background: #004488; color: white; text-align: right; }
-        .ai { background: #333; color: #00ffcc; }
-        .error { color: #ff5555; font-size: 0.9em; }
+        body { font-family: monospace; background: #000; color: #0f0; padding: 20px; text-align: center; }
+        video { width: 100%; max-width: 500px; border: 2px solid #0f0; margin-bottom: 10px; }
+        #log { background: #111; border: 1px solid #333; height: 200px; overflow-y: auto; text-align: left; padding: 10px; font-size: 12px; color: #ccc; }
+        button { background: #0f0; color: #000; border: none; padding: 10px 20px; font-weight: bold; cursor: pointer; margin: 5px; }
+        .err { color: #ff5555; }
+        .succ { color: #00ff00; }
     </style>
 </head>
 <body>
-
-    <h2>Budi AI 👁️</h2>
-    <video id="video" autoplay playsinline muted></video>
+    <h1>BUDI AI - DEBUG CONSOLE</h1>
+    <video id="vid" autoplay playsinline muted></video>
     <br>
-    <button onclick="startCam()">Nyalakan Kamera</button>
-    <button onclick="lookAndTalk()" id="btnLook">👁️ Intip & Komentar</button>
+    <button onclick="init()">1. Nyalakan Kamera</button>
+    <button onclick="testVision()">2. Test Lihat (Debug)</button>
     
-    <div id="chat"></div>
+    <div id="log">Menunggu perintah...</div>
 
     <script>
-        // GANTI DENGAN API KEY KAMU
+        // PENTING: GANTI INI DENGAN API KEY ASLI ANDA DARI GROQ.COM
         const API_KEY = "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"; 
         
-        // Gunakan model VISION yang spesifik. Jangan pakai model teks biasa untuk gambar!
-        const MODEL_VISION = "llama-3.2-11b-vision-preview"; 
-        const URL = "https://api.groq.com/openai/v1/chat/completions";
+        // Model ID yang saat ini aktif di Groq (per Juni 2026)
+        const MODEL_ID = "llama-3.2-11b-vision-preview"; 
 
+        const logDiv = document.getElementById('log');
+        const vid = document.getElementById('vid');
         let stream;
-        const video = document.getElementById('video');
-        const chat = document.getElementById('chat');
-        const btnLook = document.getElementById('btnLook');
 
-        function addMsg(text, type) {
+        function log(msg, type='') {
             const div = document.createElement('div');
-            div.className = `msg ${type}`;
-            div.textContent = text;
-            chat.appendChild(div);
-            chat.scrollTop = chat.scrollHeight;
+            div.textContent = `> ${msg}`;
+            if(type) div.className = type;
+            logDiv.appendChild(div);
+            logDiv.scrollTop = logDiv.scrollHeight;
         }
 
-        async function startCam() {
+        async function init() {
             try {
                 stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                video.srcObject = stream;
-                addMsg("Kamera aktif.", "ai");
-            } catch (err) {
-                addMsg("Gagal nyalakan kamera: " + err.message, "error");
+                vid.srcObject = stream;
+                log("Kamera berhasil dinyalakan.", "succ");
+            } catch (e) {
+                log("Gagal nyalakan kamera: " + e.message, "err");
             }
         }
 
-        async function lookAndTalk() {
-            if (!stream) {
-                addMsg("Kamera mati dulu nih, nyalain dulu ya!", "ai");
-                return;
-            }
+        async function testVision() {
+            if (!stream) return log("Kamera mati! Klik tombol 1 dulu.", "err");
+            if (API_KEY.includes("XXXX")) return log("API KEY BELUM DIGANTI DI KODE!", "err");
 
-            btnLook.disabled = true;
-            btnLook.textContent = "Budi sedang melihat...";
-            addMsg("Budi sedang melihat...", "ai");
+            log("Mengambil frame gambar...", "succ");
+            
+            // Ambil Gambar
+            const canvas = document.createElement('canvas');
+            canvas.width = vid.videoWidth;
+            canvas.height = vid.videoHeight;
+            canvas.getContext('2d').drawImage(vid, 0, 0);
+            const base64 = canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
+
+            log(`Mengirim ke Groq (Model: ${MODEL_ID})...`);
 
             try {
-                // 1. Ambil Gambar dari Video
-                const canvas = document.createElement('canvas');
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                canvas.getContext('2d').drawImage(video, 0, 0);
-                
-                // Ubah ke Base64
-                const base64Image = canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
-
-                // 2. Kirim ke Groq
-                const response = await fetch(URL, {
+                const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
                     method: "POST",
                     headers: {
                         "Authorization": `Bearer ${API_KEY}`,
                         "Content-Type": "application/json"
                     },
                     body: JSON.stringify({
-                        model: MODEL_VISION,
-                        messages: [
-                            {
-                                role: "system",
-                                content: "Kamu teman ngobrol yang santai. Berkomentarlah tentang gambar ini dengan singkat, lucu, atau penasaran. Jangan kaku."
-                            },
-                            {
-                                role: "user",
-                                content: [
-                                    { type: "text", text: "Apa yang kamu lihat di sini? Komentar dong." },
-                                    { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64Image}` } }
-                                ]
-                            }
-                        ],
-                        temperature: 0.7,
-                        max_tokens: 100
+                        model: MODEL_ID,
+                        messages: [{
+                            role: "user",
+                            content: [
+                                { type: "text", text: "Halo, apa yang kamu lihat?" },
+                                { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64}` } }
+                            ]
+                        }],
+                        max_tokens: 50
                     })
                 });
 
-                // 3. Cek Error dari Server
-                if (!response.ok) {
-                    const errData = await response.json();
-                    throw new Error(errData.error?.message || "Error dari server Groq");
+                const data = await res.json();
+
+                if (!res.ok) {
+                    // Tampilkan error detail dari Groq
+                    log(`ERROR API: ${data.error?.message || "Unknown Error"}`, "err");
+                    return;
                 }
 
-                const data = await response.json();
-
-                // 4. Ambil Jawaban dengan Aman (Cegah Undefined)
                 const reply = data.choices?.[0]?.message?.content;
-
                 if (reply) {
-                    addMsg(reply, "ai");
-                    speak(reply);
+                    log(`BUDI: ${reply}`, "succ");
                 } else {
-                    addMsg("Maaf, Budi bingung nggak ada jawabannya.", "error");
+                    log("Respons kosong dari API.", "err");
                 }
 
-            } catch (error) {
-                console.error(error);
-                addMsg("Error: " + error.message, "error");
-            } finally {
-                btnLook.disabled = false;
-                btnLook.textContent = "👁️ Intip & Komentar";
+            } catch (e) {
+                log(`Error Jaringan/Code: ${e.message}`, "err");
             }
-        }
-
-        function speak(text) {
-            const u = new SpeechSynthesisUtterance(text);
-            u.lang = 'id-ID';
-            speechSynthesis.speak(u);
         }
     </script>
 </body>

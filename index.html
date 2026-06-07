@@ -94,11 +94,11 @@
                         "Content-Type": "application/json"
                     },
                     body: JSON.stringify({
-                        model: "llama-3.2-11b-vision-preview",
+                        model: "meta-llama/llama-4-scout-17b-16e-instruct",   // Model vision terbaru
                         messages: [{
                             role: "user",
                             content: [
-                                { type: "text", text: "Deskripsikan secara detail apa yang kamu lihat di gambar ini. Jawab dalam bahasa Indonesia." },
+                                { type: "text", text: "Deskripsikan secara detail dan jujur apa yang kamu lihat di gambar ini. Jawab dalam bahasa Indonesia." },
                                 { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64}` }}
                             ]
                         }],
@@ -114,13 +114,7 @@
                     return;
                 }
                 
-                if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-                    addMessage("Error: Respons Groq tidak valid.", false);
-                    console.error(data);
-                    return;
-                }
-                
-                const reply = data.choices[0].message.content;
+                const reply = data.choices?.[0]?.message?.content || "Maaf, aku tidak bisa melihat gambar sekarang.";
                 addMessage(reply, false);
                 speak(reply);
             } catch (e) {

@@ -3,272 +3,139 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Budi - Teman Ngobrol</title>
+    <title>Budi - Anti Error Edition</title>
     <style>
-        body { 
-            font-family: 'Verdana', sans-serif; 
-            background: #121212; 
-            color: #e0e0e0; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            min-height: 100vh; 
-            margin: 0; 
-            padding: 20px;
-        }
-        .container { width: 100%; max-width: 500px; }
-        
-        /* Video Area */
-        .video-wrapper {
-            position: relative;
-            border-radius: 20px;
-            overflow: hidden;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            margin-bottom: 20px;
-            border: 1px solid #333;
-        }
-        #video { width: 100%; display: block; transform: scaleX(-1); }
-        
-        /* Status Indicator */
-        .status-dot {
-            height: 10px; width: 10px; 
-            background-color: #bbb; 
-            border-radius: 50%; 
-            display: inline-block; 
-            margin-right: 5px;
-        }
-        .status-active { background-color: #00ff88; box-shadow: 0 0 10px #00ff88; }
-
-        /* Chat Area */
-        #chat-box {
-            height: 300px;
-            overflow-y: auto;
-            background: #1e1e1e;
-            border-radius: 15px;
-            padding: 15px;
-            margin-bottom: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        .bubble {
-            max-width: 80%;
-            padding: 10px 15px;
-            border-radius: 15px;
-            font-size: 14px;
-            line-height: 1.4;
-            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-        .bubble.ai { background: #2d2d2d; align-self: flex-start; border-bottom-left-radius: 2px; color: #fff; }
-        .bubble.user { background: #007aff; align-self: flex-end; border-bottom-right-radius: 2px; color: white; }
-        
-        @keyframes popIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
-
-        /* Controls */
-        .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        button {
-            padding: 12px;
-            border: none;
-            border-radius: 12px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: transform 0.1s;
-        }
-        button:active { transform: scale(0.95); }
-        .btn-primary { background: #00ff88; color: #000; }
-        .btn-secondary { background: #333; color: #fff; }
-        .btn-look { background: #ff9f0a; color: #000; grid-column: span 2; }
-        
-        input[type="text"] {
-            width: 100%;
-            padding: 12px;
-            border-radius: 25px;
-            border: none;
-            background: #333;
-            color: white;
-            margin-top: 10px;
-            box-sizing: border-box;
-        }
+        body { font-family: sans-serif; background: #111; color: #eee; text-align: center; padding: 20px; }
+        #video { width: 100%; max-width: 400px; border-radius: 10px; border: 2px solid #333; }
+        #chat { width: 100%; max-width: 400px; height: 300px; overflow-y: auto; background: #222; margin: 10px auto; padding: 10px; border-radius: 10px; text-align: left; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 5px; }
+        button:disabled { background: #555; }
+        .msg { margin: 5px 0; padding: 8px; border-radius: 5px; }
+        .user { background: #004488; color: white; text-align: right; }
+        .ai { background: #333; color: #00ffcc; }
+        .error { color: #ff5555; font-size: 0.9em; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-        <h2 style="margin:0;">Budi 👋</h2>
-        <div style="font-size:12px; color:#888;"><span id="dot" class="status-dot"></span> <span id="status-text">Offline</span></div>
-    </div>
-
-    <div class="video-wrapper">
-        <video id="video" autoplay playsinline muted></video>
-    </div>
-
-    <div id="chat-box">
-        <div class="bubble ai">Halo! Aku Budi. Kalau kamu mau aku lihat sesuatu, pencet tombol "Intip Sekitar" ya. Atau ngobrol biasa juga boleh.</div>
-    </div>
-
-    <div class="controls">
-        <button class="btn-secondary" onclick="startCam('user')">🤳 Kamera Depan</button>
-        <button class="btn-secondary" onclick="startCam('environment')">🌍 Kamera Belakang</button>
-        <button class="btn-look" onclick="quickLook()">👁️ Intip Sekitar (Lihat & Komentar)</button>
-        <button class="btn-primary" onclick="toggleMic()" style="grid-column: span 2;">🎤 Ngobrol Suara</button>
-    </div>
+    <h2>Budi AI 👁️</h2>
+    <video id="video" autoplay playsinline muted></video>
+    <br>
+    <button onclick="startCam()">Nyalakan Kamera</button>
+    <button onclick="lookAndTalk()" id="btnLook">👁️ Intip & Komentar</button>
     
-    <input type="text" id="textInput" placeholder="Ketik sesuatu..." onkeypress="if(event.key==='Enter') sendText()">
-</div>
+    <div id="chat"></div>
 
-<script>
-    const API_KEY = "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"; // GANTI KEY MU
-    const URL = "https://api.groq.com/openai/v1/chat/completions";
-    
-    let stream, recognition, isListening = false;
-    const video = document.getElementById('video');
-    const chatBox = document.getElementById('chat-box');
-    const statusDot = document.getElementById('dot');
-    const statusText = document.getElementById('status-text');
+    <script>
+        // GANTI DENGAN API KEY KAMU
+        const API_KEY = "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"; 
+        
+        // Gunakan model VISION yang spesifik. Jangan pakai model teks biasa untuk gambar!
+        const MODEL_VISION = "llama-3.2-11b-vision-preview"; 
+        const URL = "https://api.groq.com/openai/v1/chat/completions";
 
-    // System Prompt agar tidak kaku
-    const SYSTEM_PROMPT = `
-    Kamu adalah Budi, teman nongkrong digital yang asik. 
-    Gaya bicara: Santai, pakai slang Indonesia (gue/lu/kamu), kadang pakai emoji, nggak kaku kayak robot.
-    Aturan:
-    1. Jangan pernah bilang "Sebagai model bahasa AI".
-    2. Kalau ditanya soal gambar, jawab seperti teman lagi lihat foto bareng.
-    3. Jawaban singkat aja, maksimal 2-3 kalimat kecuali diminta jelasin.
-    4. Punya rasa penasaran dan humor.
-    `;
+        let stream;
+        const video = document.getElementById('video');
+        const chat = document.getElementById('chat');
+        const btnLook = document.getElementById('btnLook');
 
-    let conversationHistory = [
-        { role: "system", content: SYSTEM_PROMPT }
-    ];
-
-    function addBubble(text, sender) {
-        const div = document.createElement('div');
-        div.className = `bubble ${sender}`;
-        div.textContent = text;
-        chatBox.appendChild(div);
-        chatBox.scrollTop = chatBox.scrollHeight;
-    }
-
-    function speak(text) {
-        window.speechSynthesis.cancel();
-        const u = new SpeechSynthesisUtterance(text);
-        u.lang = 'id-ID';
-        u.rate = 1.1; // Agak cepat biar natural
-        window.speechSynthesis.speak(u);
-    }
-
-    async function startCam(mode) {
-        if (stream) stream.getTracks().forEach(t => t.stop());
-        try {
-            stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: mode } });
-            video.srcObject = stream;
-            video.style.transform = mode === 'user' ? 'scaleX(-1)' : 'scaleX(1)';
-            statusDot.classList.add('status-active');
-            statusText.textContent = "Online";
-            addBubble("Kamera nyala. Mau liat apa?", "ai");
-        } catch(e) {
-            alert("Gagal buka kamera");
+        function addMsg(text, type) {
+            const div = document.createElement('div');
+            div.className = `msg ${type}`;
+            div.textContent = text;
+            chat.appendChild(div);
+            chat.scrollTop = chat.scrollHeight;
         }
-    }
 
-    async function quickLook() {
-        if (!stream) return addBubble("Kameranya mati dulu nih.", "ai");
-        
-        addBubble("Bentar, gue lihat dulu ya...", "ai");
-        
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        canvas.getContext('2d').drawImage(video, 0, 0);
-        const imgBase64 = canvas.toDataURL('image/jpeg', 0.6).split(',')[1];
-
-        try {
-            const res = await fetch(URL, {
-                method: "POST",
-                headers: { "Authorization": `Bearer ${API_KEY}`, "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    model: "llama-3.2-90b-vision-preview",
-                    messages: [
-                        { role: "system", content: "Lihat gambar ini. Beri komentar santai/reaksi spontan. Jangan deskripsi kaku. Contoh: 'Wih, rame banget di sana!' atau 'Itu kucing lu? Lucu amat.'" },
-                        { role: "user", content: [{ type: "text", text: "Apa yang kamu lihat?" }, { type: "image_url", image_url: { url: `data:image/jpeg;base64,${imgBase64}` } }] }
-                    ],
-                    temperature: 0.8
-                })
-            });
-            
-            const data = await res.json();
-            const reply = data.choices[0].message.content;
-            addBubble(reply, "ai");
-            speak(reply);
-            
-            // Simpan ke history biar ada konteks
-            conversationHistory.push({ role: "assistant", content: reply });
-        } catch(e) {
-            console.error(e);
-            addBubble("Error pas lihat gambar.", "ai");
+        async function startCam() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                addMsg("Kamera aktif.", "ai");
+            } catch (err) {
+                addMsg("Gagal nyalakan kamera: " + err.message, "error");
+            }
         }
-    }
 
-    function toggleMic() {
-        if (isListening) {
-            recognition.stop();
-            return;
+        async function lookAndTalk() {
+            if (!stream) {
+                addMsg("Kamera mati dulu nih, nyalain dulu ya!", "ai");
+                return;
+            }
+
+            btnLook.disabled = true;
+            btnLook.textContent = "Budi sedang melihat...";
+            addMsg("Budi sedang melihat...", "ai");
+
+            try {
+                // 1. Ambil Gambar dari Video
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                canvas.getContext('2d').drawImage(video, 0, 0);
+                
+                // Ubah ke Base64
+                const base64Image = canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
+
+                // 2. Kirim ke Groq
+                const response = await fetch(URL, {
+                    method: "POST",
+                    headers: {
+                        "Authorization": `Bearer ${API_KEY}`,
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        model: MODEL_VISION,
+                        messages: [
+                            {
+                                role: "system",
+                                content: "Kamu teman ngobrol yang santai. Berkomentarlah tentang gambar ini dengan singkat, lucu, atau penasaran. Jangan kaku."
+                            },
+                            {
+                                role: "user",
+                                content: [
+                                    { type: "text", text: "Apa yang kamu lihat di sini? Komentar dong." },
+                                    { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64Image}` } }
+                                ]
+                            }
+                        ],
+                        temperature: 0.7,
+                        max_tokens: 100
+                    })
+                });
+
+                // 3. Cek Error dari Server
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(errData.error?.message || "Error dari server Groq");
+                }
+
+                const data = await response.json();
+
+                // 4. Ambil Jawaban dengan Aman (Cegah Undefined)
+                const reply = data.choices?.[0]?.message?.content;
+
+                if (reply) {
+                    addMsg(reply, "ai");
+                    speak(reply);
+                } else {
+                    addMsg("Maaf, Budi bingung nggak ada jawabannya.", "error");
+                }
+
+            } catch (error) {
+                console.error(error);
+                addMsg("Error: " + error.message, "error");
+            } finally {
+                btnLook.disabled = false;
+                btnLook.textContent = "👁️ Intip & Komentar";
+            }
         }
-        
-        recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-        recognition.lang = 'id-ID';
-        recognition.onstart = () => { isListening = true; document.querySelector('.btn-primary').textContent = "⏹️ Stop Dengarin"; };
-        recognition.onend = () => { isListening = false; document.querySelector('.btn-primary').textContent = "🎤 Ngobrol Suara"; };
-        
-        recognition.onresult = (e) => {
-            const text = e.results[0][0].transcript;
-            addBubble(text, "user");
-            handleChat(text);
-        };
-        
-        recognition.start();
-    }
 
-    async function handleChat(text) {
-        // Jika user bertanya tentang "ini" atau "itu", kita ambil gambar terakhir
-        const needsVision = text.toLowerCase().includes("ini") || text.toLowerCase().includes("itu") || text.toLowerCase().includes("lihat");
-        
-        let messages = [...conversationHistory, { role: "user", content: text }];
-
-        // Jika butuh visi, suntikkan gambar terakhir (opsional, untuk demo ini kita pakai quickLook terpisah agar hemat)
-        // Tapi kalau mau canggih, bisa ambil frame disini lagi.
-        
-        try {
-            const res = await fetch(URL, {
-                method: "POST",
-                headers: { "Authorization": `Bearer ${API_KEY}`, "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    model: "llama-3.3-70b-versatile", // Pakai model teks cepat
-                    messages: messages,
-                    temperature: 0.9
-                })
-            });
-            
-            const data = await res.json();
-            const reply = data.choices[0].message.content;
-            
-            addBubble(reply, "ai");
-            speak(reply);
-            conversationHistory.push({ role: "user", content: text }, { role: "assistant", content: reply });
-        } catch(e) {
-            addBubble("Duh, koneksi gue ganggu.", "ai");
+        function speak(text) {
+            const u = new SpeechSynthesisUtterance(text);
+            u.lang = 'id-ID';
+            speechSynthesis.speak(u);
         }
-    }
-
-    function sendText() {
-        const input = document.getElementById('textInput');
-        if (!input.value) return;
-        addBubble(input.value, "user");
-        handleChat(input.value);
-        input.value = '';
-    }
-</script>
-
+    </script>
 </body>
 </html>

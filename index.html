@@ -60,20 +60,15 @@
         }
 
         function startCamera(facingMode) {
-            // Stop stream lama jika ada
-            if (currentStream) {
-                currentStream.getTracks().forEach(track => track.stop());
-            }
-
-            navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: facingMode } 
-            })
+            if (currentStream) currentStream.getTracks().forEach(track => track.stop());
+            
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: facingMode } })
             .then(stream => { 
                 currentStream = stream;
                 video.srcObject = stream; 
-                addMessage(`Kamera ${facingMode === 'user' ? 'depan' : 'belakang'} sudah aktif.`, false);
+                addMessage(`Kamera ${facingMode === 'user' ? 'depan' : 'belakang'} aktif.`, false);
             })
-            .catch(err => alert("Gagal mengakses kamera: " + err.message));
+            .catch(err => addMessage("Gagal akses kamera: " + err.message, false));
         }
 
         async function captureAndAsk() {
@@ -89,7 +84,7 @@
             
             const base64 = canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
             
-            addMessage("Sedang melihat...", false);
+            addMessage("Sedang melihat melalui kamera...", false);
             
             try {
                 const response = await fetch(GROQ_URL, {
@@ -100,32 +95,43 @@
                     },
                     body: JSON.stringify({
                         model: "llama-3.2-11b-vision-preview",
-                        messages: [
-                            {
-                                role: "user",
-                                content: [
-                                    { type: "text", text: "Deskripsikan secara detail dan jujur apa yang kamu lihat di gambar ini. Jawab dalam bahasa Indonesia." },
-                                    { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64}` } }
-                                ]
-                            }
-                        ],
+                        messages: [{
+                            role: "user",
+                            content: [
+                                { type: "text", text: "Deskripsikan secara detail apa yang kamu lihat di gambar ini. Jawab dalam bahasa Indonesia." },
+                                { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64}` }}
+                            ]
+                        }],
                         temperature: 0.7,
                         max_tokens: 500
                     })
                 });
 
                 const data = await response.json();
+                
+                if (data.error) {
+                    addMessage("Error Groq: " + data.error.message, false);
+                    return;
+                }
+                
+                if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+                    addMessage("Error: Respons Groq tidak valid.", false);
+                    console.error(data);
+                    return;
+                }
+                
                 const reply = data.choices[0].message.content;
                 addMessage(reply, false);
                 speak(reply);
             } catch (e) {
                 addMessage("Error melihat gambar: " + e.message, false);
+                console.error(e);
             }
         }
 
         function startListening() {
             if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
-                alert("Browser tidak mendukung mic.");
+                addMessage("Browser tidak support mic.", false);
                 return;
             }
             recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
@@ -146,10 +152,7 @@
             try {
                 const res = await fetch(GROQ_URL, {
                     method: "POST",
-                    headers: { 
-                        "Authorization": `Bearer ${GROQ_API_KEY}`, 
-                        "Content-Type": "application/json" 
-                    },
+                    headers: { "Authorization": `Bearer ${GROQ_API_KEY}`, "Content-Type": "application/json" },
                     body: JSON.stringify({
                         model: "llama-3.3-70b-versatile",
                         messages: [{ role: "user", content: text }],
@@ -157,7 +160,7 @@
                     })
                 });
                 const data = await res.json();
-                const reply = data.choices[0].message.content;
+                const reply = data.choices?.[0]?.message?.content || "Maaf, aku tidak bisa memproses sekarang.";
                 addMessage(reply, false);
                 speak(reply);
             } catch (e) { 

@@ -3,186 +3,244 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Budi - Llama 4 Vision</title>
+    <title>Budi - AI with Memory</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #121212; color: #e0e0e0; text-align: center; padding: 20px; margin: 0; }
+        body { font-family: 'Segoe UI', sans-serif; background: #121212; color: #e0e0e0; text-align: center; padding: 20px; margin: 0; }
         h1 { color: #00ffcc; text-shadow: 0 0 10px rgba(0, 255, 204, 0.5); }
-        #video { width: 100%; max-width: 640px; border-radius: 12px; border: 2px solid #333; background: #000; transform: scaleX(-1); }
-        #chat { width: 100%; max-width: 640px; height: 300px; margin: 20px auto; overflow-y: auto; background: #1e1e1e; padding: 15px; text-align: left; border-radius: 10px; border: 1px solid #333; }
-        .controls { margin: 20px 0; }
-        button { padding: 12px 24px; margin: 5px; background: #007acc; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: background 0.2s; }
-        button:hover { background: #005fa3; }
-        button:disabled { background: #555; cursor: not-allowed; }
-        input { padding: 12px; width: 70%; max-width: 400px; border-radius: 8px; border: 1px solid #444; background: #222; color: white; }
         
-        .msg { margin: 10px 0; padding: 10px; border-radius: 8px; line-height: 1.5; }
-        .msg-user { background: #004488; color: white; text-align: right; }
-        .msg-ai { background: #2d2d2d; color: #00ffcc; border-left: 4px solid #00ffcc; }
-        .msg-error { color: #ff6b6b; font-size: 0.9em; text-align: center; }
+        /* Layout */
+        .container { max-width: 600px; margin: 0 auto; }
+        #video { width: 100%; border-radius: 12px; border: 2px solid #333; background: #000; transform: scaleX(-1); margin-bottom: 15px; }
+        
+        /* Chat Box */
+        #chat { 
+            height: 350px; 
+            overflow-y: auto; 
+            background: #1e1e1e; 
+            padding: 15px; 
+            border-radius: 10px; 
+            border: 1px solid #333; 
+            margin-bottom: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .msg { padding: 10px 15px; border-radius: 15px; max-width: 80%; line-height: 1.4; font-size: 14px; }
+        .msg-user { background: #005fa3; color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
+        .msg-ai { background: #2d2d2d; color: #00ffcc; align-self: flex-start; border-bottom-left-radius: 2px; border-left: 3px solid #00ffcc; }
+        .msg-sys { color: #888; font-size: 12px; align-self: center; font-style: italic; }
+
+        /* Controls */
+        .btn-group { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+        button { padding: 10px 16px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .btn-cam { background: #333; color: white; }
+        .btn-action { background: #007acc; color: white; }
+        .btn-reset { background: #dc3545; color: white; }
+        button:hover { opacity: 0.9; transform: translateY(-2px); }
+        button:disabled { background: #555; cursor: not-allowed; transform: none; }
+
+        input { width: 70%; padding: 12px; border-radius: 25px; border: 1px solid #444; background: #222; color: white; outline: none; }
     </style>
 </head>
 <body>
 
-    <h1>Budi - Neuron Vision (Llama 4)</h1>
+<div class="container">
+    <h1>Budi 🧠</h1>
     
     <video id="video" autoplay playsinline muted></video>
     
-    <div class="controls">
-        <button onclick="startCamera('user')">📷 Kamera Depan</button>
-        <button onclick="startCamera('environment')">🌍 Kamera Belakang</button>
-        <button onclick="captureAndAsk()" id="btnLook">👁️ Intip & Komentar</button>
+    <div class="btn-group">
+        <button class="btn-cam" onclick="startCamera('user')">🤳 Depan</button>
+        <button class="btn-cam" onclick="startCamera('environment')">🌍 Belakang</button>
+        <button class="btn-action" onclick="captureAndAsk()" id="btnLook">👁️ Intip</button>
+        <button class="btn-reset" onclick="resetMemory()">🗑️ Lupa Semua</button>
     </div>
-
-    <input type="text" id="textInput" placeholder="Ketik pesan..." onkeypress="if(event.key === 'Enter') sendText()">
-    <button onclick="sendText()">Kirim</button>
 
     <div id="chat"></div>
 
-    <script>
-        // PENTING: Ganti dengan API Key Anda dari https://console.groq.com
-        const GROQ_API_KEY = "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"; 
+    <input type="text" id="textInput" placeholder="Chat dengan Budi..." onkeypress="if(event.key === 'Enter') sendText()">
+    <button class="btn-action" onclick="sendText()">Kirim</button>
+</div>
+
+<script>
+    // --- KONFIGURASI ---
+    const GROQ_API_KEY = "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"; // GANTI KEY ANDA
+    const VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct";
+    const TEXT_MODEL = "llama-3.3-70b-versatile";
+    const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+
+    // --- STATE & MEMORY ---
+    let currentStream;
+    let isProcessing = false;
+    
+    // Ini adalah "Otak" Budi. Kita simpan System Prompt di awal.
+    let chatHistory = [
+        {
+            role: "system",
+            content: "Nama kamu Budi. Kamu adalah teman digital yang santai, lucu, dan peduli. Gaya bicara: Gunakan bahasa Indonesia sehari-hari (gue/lu/kamu), jangan kaku. Ingat-ingatlah apa yang dibicarakan user sebelumnya."
+        }
+    ];
+
+    const video = document.getElementById('video');
+    const chatBox = document.getElementById('chat');
+    const btnLook = document.getElementById('btnLook');
+
+    // --- FUNGSI UTAMA ---
+
+    function addMessage(text, type) {
+        const div = document.createElement('div');
+        div.className = `msg msg-${type}`;
+        div.textContent = text;
+        chatBox.appendChild(div);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function speak(text) {
+        speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = 'id-ID';
+        u.rate = 1.0;
+        speechSynthesis.speak(u);
+    }
+
+    // 1. Kamera
+    async function startCamera(facingMode) {
+        if (currentStream) currentStream.getTracks().forEach(t => t.stop());
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facingMode } });
+            currentStream = stream;
+            video.srcObject = stream;
+            video.style.transform = facingMode === 'user' ? 'scaleX(-1)' : 'scaleX(1)';
+            addMessage("Kamera siap.", "sys");
+        } catch (e) {
+            addMessage("Gagal akses kamera.", "sys");
+        }
+    }
+
+    // 2. Reset Memory
+    function resetMemory() {
+        // Simpan lagi system prompt awal
+        chatHistory = [chatHistory[0]]; 
+        addMessage("Ingatan Budi telah direset. Kita mulai dari awal ya!", "sys");
+    }
+
+    // 3. Logika Kirim Pesan (Teks Saja)
+    async function sendText() {
+        const input = document.getElementById('textInput');
+        const text = input.value.trim();
+        if (!text || isProcessing) return;
+
+        // Tampilkan pesan user
+        addMessage(text, "user");
+        input.value = "";
         
-        // Model Vision Terbaru yang Didukung Groq (Juni 2026)
-        const VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct";
-        const TEXT_MODEL = "llama-3.3-70b-versatile";
-        const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
-        
-        let currentStream;
-        const video = document.getElementById('video');
-        const chat = document.getElementById('chat');
-        const btnLook = document.getElementById('btnLook');
+        // Masukkan ke history
+        chatHistory.push({ role: "user", content: text });
 
-        function addMessage(text, type) {
-            const div = document.createElement('div');
-            div.className = `msg msg-${type}`;
-            div.textContent = text;
-            chat.appendChild(div);
-            chat.scrollTop = chat.scrollHeight;
+        await processAI(false); // false = tanpa gambar
+    }
+
+    // 4. Logika Intip (Gambar + Konteks Chat)
+    async function captureAndAsk() {
+        if (!video.srcObject) return addMessage("Nyalakan kamera dulu.", "sys");
+        if (isProcessing) return;
+
+        isProcessing = true;
+        btnLook.disabled = true;
+        btnLook.textContent = "Melihat...";
+        addMessage("Budi sedang melihat...", "sys");
+
+        // Ambil Gambar
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        if (video.style.transform.includes('scaleX(-1)')) {
+            ctx.translate(canvas.width, 0);
+            ctx.scale(-1, 1);
         }
+        ctx.drawImage(video, 0, 0);
+        const base64 = canvas.toDataURL('image/jpeg', 0.6).split(',')[1];
 
-        function speak(text) {
-            speechSynthesis.cancel();
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = 'id-ID';
-            speechSynthesis.speak(utterance);
-        }
+        // Siapkan pesan khusus untuk request ini
+        // Kita kirim HISTORY CHAT + GAMBAR BARU
+        const messagesPayload = [...chatHistory, {
+            role: "user",
+            content: [
+                { type: "text", text: "(Melihat kamera) Apa yang kamu lihat? Hubungkan dengan obrolan kita tadi jika relevan." },
+                { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64}` } }
+            ]
+        }];
 
-        async function startCamera(facingMode) {
-            if (currentStream) currentStream.getTracks().forEach(track => track.stop());
+        try {
+            const res = await fetch(GROQ_URL, {
+                method: "POST",
+                headers: { "Authorization": `Bearer ${GROQ_API_KEY}`, "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    model: VISION_MODEL,
+                    messages: messagesPayload,
+                    temperature: 0.7,
+                    max_tokens: 300
+                })
+            });
+
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error?.message);
+
+            const reply = data.choices[0].message.content;
             
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: facingMode } 
-                });
-                currentStream = stream;
-                video.srcObject = stream;
-                video.style.transform = facingMode === 'user' ? 'scaleX(-1)' : 'scaleX(1)';
-                addMessage(`Kamera ${facingMode === 'user' ? 'depan' : 'belakang'} aktif.`, 'ai');
-            } catch (err) {
-                addMessage("Gagal akses kamera: " + err.message, 'error');
-            }
+            // Tampilkan & Bicara
+            addMessage(reply, "ai");
+            speak(reply);
+
+            // PENTING: Simpan respon AI ke history agar diingat nanti
+            // Karena format vision agak kompleks, kita simpan ringkasan teksnya saja di history agar hemat token
+            chatHistory.push({ role: "assistant", content: reply });
+
+        } catch (e) {
+            addMessage("Error: " + e.message, "sys");
+        } finally {
+            isProcessing = false;
+            btnLook.disabled = false;
+            btnLook.textContent = "👁️ Intip";
         }
+    }
 
-        async function captureAndAsk() {
-            if (!video.srcObject) {
-                addMessage("Nyalakan kamera dulu!", 'error');
-                return;
-            }
+    // 5. Proses AI (Shared Logic)
+    async function processAI(withImage = false) {
+        isProcessing = true;
+        addMessage("Budi berpikir...", "sys");
+
+        try {
+            const res = await fetch(GROQ_URL, {
+                method: "POST",
+                headers: { "Authorization": `Bearer ${GROQ_API_KEY}`, "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    model: TEXT_MODEL, // Pakai model teks cepat untuk chat biasa
+                    messages: chatHistory,
+                    temperature: 0.7
+                })
+            });
+
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error?.message);
+
+            const reply = data.choices[0].message.content;
             
-            btnLook.disabled = true;
-            btnLook.textContent = "Sedang melihat...";
-            addMessage("Budi sedang mengamati...", 'ai');
+            addMessage(reply, "ai");
+            speak(reply);
 
-            try {
-                const canvas = document.createElement('canvas');
-                canvas.width = video.videoWidth || 640;
-                canvas.height = video.videoHeight || 480;
-                const ctx = canvas.getContext('2d');
-                
-                // Flip context jika kamera depan agar tidak terbalik
-                if (video.style.transform.includes('scaleX(-1)')) {
-                    ctx.translate(canvas.width, 0);
-                    ctx.scale(-1, 1);
-                }
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                
-                // Kompresi gambar (quality 0.6 untuk keseimbangan kecepatan & kualitas)
-                const base64 = canvas.toDataURL('image/jpeg', 0.6).split(',')[1];
-                
-                const response = await fetch(GROQ_URL, {
-                    method: "POST",
-                    headers: {
-                        "Authorization": `Bearer ${GROQ_API_KEY}`,
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({
-                        model: VISION_MODEL,
-                        messages: [{
-                            role: "user",
-                            content: [
-                                { type: "text", text: "Lihat gambar ini. Beri komentar santai dan natural seperti teman nongkrong. Apa yang kamu lihat?" },
-                                { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64}` }}
-                            ]
-                        }],
-                        temperature: 0.7,
-                        max_tokens: 300
-                    })
-                });
+            // Simpan ke memory
+            chatHistory.push({ role: "assistant", content: reply });
 
-                if (!response.ok) {
-                    const errData = await response.json();
-                    throw new Error(errData.error?.message || "Error API");
-                }
-
-                const data = await response.json();
-                const reply = data.choices?.[0]?.message?.content;
-                
-                if (reply) {
-                    addMessage(reply, 'ai');
-                    speak(reply);
-                } else {
-                    addMessage("Maaf, Budi tidak bisa menghasilkan jawaban.", 'error');
-                }
-
-            } catch (e) {
-                console.error(e);
-                addMessage("Error: " + e.message, 'error');
-            } finally {
-                btnLook.disabled = false;
-                btnLook.textContent = "👁️ Intip & Komentar";
-            }
+        } catch (e) {
+            addMessage("Error koneksi: " + e.message, "sys");
+        } finally {
+            isProcessing = false;
         }
+    }
+</script>
 
-        async function sendText() {
-            const input = document.getElementById('textInput');
-            const text = input.value.trim();
-            if (!text) return;
-            
-            addMessage(text, 'user');
-            input.value = "";
-            
-            // Untuk teks saja, gunakan model teks yang lebih cepat
-            try {
-                const res = await fetch(GROQ_URL, {
-                    method: "POST",
-                    headers: { "Authorization": `Bearer ${GROQ_API_KEY}`, "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        model: TEXT_MODEL,
-                        messages: [{ role: "user", content: text }],
-                        temperature: 0.7
-                    })
-                });
-                
-                const data = await res.json();
-                const reply = data.choices?.[0]?.message?.content;
-                if (reply) {
-                    addMessage(reply, 'ai');
-                    speak(reply);
-                }
-            } catch (e) {
-                addMessage("Error kirim teks: " + e.message, 'error');
-            }
-        }
-    </script>
 </body>
 </html>

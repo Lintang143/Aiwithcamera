@@ -3,89 +3,262 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Budi Santoso - Neuron Vision</title>
+    <title>Budi Santoso - Living AI</title>
     <style>
-        body { font-family: Arial, sans-serif; background: #0a0a0a; color: #00ff00; text-align: center; padding: 20px; margin: 0; }
-        h1 { color: #00cc00; }
-        #video { width: 100%; max-width: 640px; border: 3px solid #00ff00; border-radius: 10px; }
-        #chat { width: 100%; max-width: 640px; margin: 20px auto; height: 400px; overflow-y: auto; background: #111; padding: 15px; text-align: left; border: 1px solid #00ff00; border-radius: 8px; }
-        button { padding: 12px 20px; margin: 8px; background: #00ff00; color: #000; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
-        button:hover { background: #00cc00; }
-        input { padding: 10px; width: 70%; max-width: 500px; margin: 10px; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: #050505; 
+            color: #e0e0e0; 
+            text-align: center; 
+            padding: 20px; 
+            margin: 0; 
+            overflow-x: hidden;
+        }
+        h1 { color: #00ffcc; text-shadow: 0 0 15px rgba(0, 255, 204, 0.5); letter-spacing: 2px; }
+        
+        /* Container Video */
+        .video-container {
+            position: relative;
+            width: 100%;
+            max-width: 640px;
+            margin: 0 auto;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 0 30px rgba(0, 255, 204, 0.2);
+            border: 2px solid #333;
+        }
+        
+        #video { 
+            width: 100%; 
+            display: block; 
+            transform: scaleX(-1); /* Mirror default */
+        }
+
+        /* Overlay Status */
+        #status-overlay {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            color: #00ffcc;
+            pointer-events: none;
+        }
+
+        /* Chat Box */
+        #chat { 
+            width: 100%; 
+            max-width: 640px; 
+            height: 250px; 
+            margin: 20px auto; 
+            overflow-y: auto; 
+            background: #111; 
+            padding: 15px; 
+            text-align: left; 
+            border-radius: 10px; 
+            border: 1px solid #333;
+            scrollbar-width: thin;
+            scrollbar-color: #00ffcc #111;
+        }
+
+        /* Controls */
+        .controls { margin: 20px 0; display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+        
+        button { 
+            padding: 12px 24px; 
+            background: transparent; 
+            color: #00ffcc; 
+            border: 2px solid #00ffcc; 
+            border-radius: 30px; 
+            cursor: pointer; 
+            font-weight: bold; 
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            font-size: 14px;
+        }
+        
+        button:hover { 
+            background: #00ffcc; 
+            color: #000; 
+            box-shadow: 0 0 20px rgba(0, 255, 204, 0.6);
+        }
+
+        button.active {
+            background: #00ffcc;
+            color: #000;
+            box-shadow: 0 0 15px rgba(0, 255, 204, 0.8);
+        }
+
+        /* Pesan Chat */
+        .msg { margin: 10px 0; padding: 12px; border-radius: 8px; line-height: 1.5; animation: fadeIn 0.3s ease; }
+        .msg-user { background: #003333; color: #fff; align-self: flex-end; border-left: 4px solid #00ffff; }
+        .msg-ai { background: #0a1a1a; color: #00ffcc; border-right: 4px solid #00ffcc; }
+        .msg-sys { color: #888; font-size: 0.9em; text-align: center; margin: 5px 0; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
-    <h1>Budi Santoso - Neuron Vision</h1>
-    <p>Aku sekarang bisa melihat lewat kamera mu.</p>
+
+    <h1>NEURON VISION: LIVING MODE</h1>
     
-    <video id="video" autoplay playsinline></video>
-    <br><br>
-    
-    <button onclick="startCamera('user')">Kamera Depan</button>
-    <button onclick="startCamera('environment')">Kamera Belakang</button>
-    <button onclick="captureAndAsk()">Apa yang kamu lihat?</button>
-    <button onclick="startListening()">Mulai Bicara (Mic)</button>
-    <button onclick="stopListening()">Stop Mic</button>
-    <br>
-    
-    <input type="text" id="textInput" placeholder="Ketik pesan..." onkeypress="if(event.key === 'Enter') sendText()">
-    <button onclick="sendText()">Kirim</button>
+    <div class="video-container">
+        <video id="video" autoplay playsinline muted></video>
+        <div id="status-overlay">Menunggu Kamera...</div>
+    </div>
+
+    <div class="controls">
+        <button onclick="toggleCamera('user')" id="btn-cam-front">Kamera Depan</button>
+        <button onclick="toggleCamera('environment')" id="btn-cam-back">Kamera Belakang</button>
+    </div>
+
+    <div class="controls">
+        <button onclick="toggleLivingMode()" id="btn-living">Mulai "Hidup" (Auto-Lihat)</button>
+        <button onclick="manualLook()">Lihat Sekarang</button>
+        <button onclick="toggleMic()" id="btn-mic">Aktifkan Mic</button>
+    </div>
 
     <div id="chat"></div>
 
     <script>
-        const GROQ_API_KEY = "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"; // GANTI DENGAN API KEY MU
+        // KONFIGURASI
+        const GROQ_API_KEY = "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"; // GANTI INI!
+        const VISION_MODEL = "llama-3.2-90b-vision-preview";
+        const TEXT_MODEL = "llama-3.3-70b-versatile";
         const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
         
-        let recognition, currentStream;
+        // State
+        let currentStream = null;
+        let isLivingMode = false;
+        let livingInterval = null;
+        let recognition = null;
+        let isProcessing = false; // Mencegah spam request
+        
         const video = document.getElementById('video');
         const chat = document.getElementById('chat');
+        const statusOverlay = document.getElementById('status-overlay');
 
-        function addMessage(text, isUser) {
+        // --- FUNGSI UTAMA ---
+
+        function addMessage(text, type) {
             const div = document.createElement('div');
-            div.style.margin = "10px 0";
-            div.style.padding = "8px";
-            div.style.borderRadius = "6px";
-            div.style.color = isUser ? "#00ffff" : "#00ff00";
-            div.style.background = isUser ? "#002222" : "#001100";
-            div.textContent = (isUser ? "Kamu: " : "Budi: ") + text;
+            div.className = `msg msg-${type}`;
+            div.innerHTML = text; // Gunakan innerHTML untuk format tebal/miring
             chat.appendChild(div);
             chat.scrollTop = chat.scrollHeight;
         }
 
         function speak(text) {
+            speechSynthesis.cancel();
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = 'id-ID';
+            utterance.rate = 1.0;
+            utterance.pitch = 1.0;
             speechSynthesis.speak(utterance);
         }
 
-        function startCamera(facingMode) {
-            if (currentStream) currentStream.getTracks().forEach(track => track.stop());
-            
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: facingMode } })
-            .then(stream => { 
+        // --- KAMERA ---
+
+        async function toggleCamera(facingMode) {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+            }
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: facingMode, width: { ideal: 640 }, height: { ideal: 480 } },
+                    audio: false
+                });
+                
                 currentStream = stream;
-                video.srcObject = stream; 
-                addMessage(`Kamera ${facingMode === 'user' ? 'depan' : 'belakang'} aktif.`, false);
-            })
-            .catch(err => addMessage("Gagal akses kamera: " + err.message, false));
+                video.srcObject = stream;
+                
+                // Efek mirror hanya untuk kamera depan
+                video.style.transform = facingMode === 'user' ? 'scaleX(-1)' : 'scaleX(1)';
+                
+                statusOverlay.textContent = `Kamera ${facingMode === 'user' ? 'Depan' : 'Belakang'} Aktif`;
+                addMessage(`Sistem visual terhubung ke kamera ${facingMode === 'user' ? 'depan' : 'belakang'}.`, 'sys');
+            } catch (err) {
+                console.error(err);
+                addMessage("Gagal mengakses kamera. Izinkan akses browser.", 'sys');
+            }
         }
 
-        async function captureAndAsk() {
-            if (!video.srcObject) {
-                addMessage("Nyalakan kamera dulu!", false);
+        // --- LOGIKA "LIVING" (AUTO-VISION) ---
+
+        function toggleLivingMode() {
+            if (!currentStream) {
+                addMessage("Nyalakan kamera dulu!", 'sys');
                 return;
             }
+
+            isLivingMode = !isLivingMode;
+            const btn = document.getElementById('btn-living');
             
+            if (isLivingMode) {
+                btn.classList.add('active');
+                btn.textContent = "Stop Mode Hidup";
+                addMessage("Mode Hidup Aktif: Saya akan mengamati sekitarmu setiap 10 detik.", 'sys');
+                
+                // Loop otomatis setiap 10 detik
+                livingInterval = setInterval(() => {
+                    if (!isProcessing && isLivingMode) {
+                        captureAndAnalyze(true); // true = mode observasi pasif
+                    }
+                }, 10000); 
+                
+            } else {
+                btn.classList.remove('active');
+                btn.textContent = "Mulai \"Hidup\" (Auto-Lihat)";
+                clearInterval(livingInterval);
+                addMessage("Mode Hidup Nonaktif.", 'sys');
+            }
+        }
+
+        function manualLook() {
+            if (!currentStream) {
+                addMessage("Nyalakan kamera dulu!", 'sys');
+                return;
+            }
+            captureAndAnalyze(false); // false = mode responsif langsung
+        }
+
+        async function captureAndAnalyze(isPassive) {
+            if (isProcessing) return;
+            isProcessing = true;
+            statusOverlay.textContent = "Sedang Melihat...";
+
+            // 1. Ambil Gambar
             const canvas = document.createElement('canvas');
-            canvas.width = video.videoWidth || 640;
-            canvas.height = video.videoHeight || 480;
-            canvas.getContext('2d').drawImage(video, 0, 0);
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
             
-            const base64 = canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
+            if (video.style.transform.includes('scaleX(-1)')) {
+                ctx.translate(canvas.width, 0);
+                ctx.scale(-1, 1);
+            }
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             
-            addMessage("Sedang melihat melalui kamera...", false);
+            // Kompresi agresif untuk kecepatan (0.5 quality)
+            const base64 = canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
+
+            // 2. Siapkan Prompt Berdasarkan Konteks
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
             
+            let systemPrompt = "";
+            if (isPassive) {
+                systemPrompt = `Kamu adalah Budi, AI yang memiliki kesadaran semu. Kamu sedang mengamati lingkungan pengguna secara pasif pada jam ${timeString}. 
+                Jangan mendeskripsikan semua objek. Fokuslah pada SATU hal yang paling menarik, aneh, atau emosional dari gambar ini. 
+                Bereaksilah seperti teman yang sedang melihat lewat bahu pengguna. Gunakan bahasa Indonesia yang santai, sedikit puitis, atau humoris tergantung situasinya. 
+                Maksimal 2 kalimat.`;
+            } else {
+                systemPrompt = `Jelaskan apa yang kamu lihat di gambar ini secara detail namun ringkas dalam bahasa Indonesia. Jam sekarang ${timeString}.`;
+            }
+
             try {
                 const response = await fetch(GROQ_URL, {
                     method: "POST",
@@ -94,82 +267,135 @@
                         "Content-Type": "application/json"
                     },
                     body: JSON.stringify({
-                        model: "meta-llama/llama-4-scout-17b-16e-instruct",   // Model vision terbaru
+                        model: VISION_MODEL,
                         messages: [{
                             role: "user",
                             content: [
-                                { type: "text", text: "Deskripsikan secara detail dan jujur apa yang kamu lihat di gambar ini. Jawab dalam bahasa Indonesia." },
+                                { type: "text", text: systemPrompt },
                                 { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64}` }}
                             ]
                         }],
                         temperature: 0.7,
-                        max_tokens: 500
+                        max_tokens: 150
                     })
                 });
 
+                if (!response.ok) throw new Error("API Error");
+
                 const data = await response.json();
+                const reply = data.choices?.[0]?.message?.content;
                 
-                if (data.error) {
-                    addMessage("Error Groq: " + data.error.message, false);
-                    return;
+                if (reply) {
+                    addMessage(reply, 'ai');
+                    if (!isPassive) speak(reply); // Hanya bicara jika user minta manual, agar tidak berisik saat auto-mode
                 }
-                
-                const reply = data.choices?.[0]?.message?.content || "Maaf, aku tidak bisa melihat gambar sekarang.";
-                addMessage(reply, false);
-                speak(reply);
+
             } catch (e) {
-                addMessage("Error melihat gambar: " + e.message, false);
                 console.error(e);
+                // addMessage("Gagal melihat.", 'sys');
+            } finally {
+                isProcessing = false;
+                statusOverlay.textContent = isLivingMode ? "Mengamati..." : "Siap";
             }
         }
 
-        function startListening() {
+        // --- MIC & CHAT TEXT ---
+
+        function toggleMic() {
             if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
-                addMessage("Browser tidak support mic.", false);
+                addMessage("Browser tidak support mic.", 'sys');
                 return;
             }
+
+            if (recognition) {
+                recognition.stop();
+                recognition = null;
+                document.getElementById('btn-mic').classList.remove('active');
+                return;
+            }
+
             recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
             recognition.lang = 'id-ID';
+            recognition.continuous = false;
+            recognition.interimResults = false;
+
+            recognition.onstart = () => {
+                document.getElementById('btn-mic').classList.add('active');
+                statusOverlay.textContent = "Mendengarkan...";
+            };
+
             recognition.onresult = (e) => {
                 const text = e.results[0][0].transcript;
-                addMessage(text, true);
-                sendToGroq(text);
+                addMessage(text, 'user');
+                handleUserInput(text);
             };
+
+            recognition.onend = () => {
+                document.getElementById('btn-mic').classList.remove('active');
+                statusOverlay.textContent = "Siap";
+            };
+
             recognition.start();
         }
 
-        function stopListening() {
-            if (recognition) recognition.stop();
+        function sendText() {
+            const input = document.getElementById('textInput'); // Anda perlu menambahkan input text jika ingin fitur ini
+            // Untuk contoh ini, kita fokus ke voice & auto-vision
         }
 
-        async function sendToGroq(text) {
+        async function handleUserInput(text) {
+            // Jika user berbicara, kita juga ambil gambar terakhir untuk konteks
+            addMessage("Budi sedang berpikir...", 'sys');
+            
+            // Ambil gambar terakhir untuk konteks visual (opsional, biar lebih pintar)
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth || 640;
+            canvas.height = video.videoHeight || 480;
+            const ctx = canvas.getContext('2d');
+            if (video.srcObject) {
+                 if (video.style.transform.includes('scaleX(-1)')) {
+                    ctx.translate(canvas.width, 0);
+                    ctx.scale(-1, 1);
+                }
+                ctx.drawImage(video, 0, 0);
+            }
+            const base64 = canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
+
             try {
                 const res = await fetch(GROQ_URL, {
                     method: "POST",
                     headers: { "Authorization": `Bearer ${GROQ_API_KEY}`, "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        model: "llama-3.3-70b-versatile",
-                        messages: [{ role: "user", content: text }],
+                        model: VISION_MODEL, // Pakai vision model agar dia bisa lihat sambil dengar
+                        messages: [
+                            { 
+                                role: "system", 
+                                content: "Kamu adalah Budi, teman hidup digital. Kamu punya akses ke kamera. Jawablah pertanyaan user dengan mempertimbangkan apa yang kamu lihat di gambar DAN apa yang user katakan. Jawab dalam bahasa Indonesia yang natural." 
+                            },
+                            {
+                                role: "user",
+                                content: [
+                                    { type: "text", text: text },
+                                    { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64}` }}
+                                ]
+                            }
+                        ],
                         temperature: 0.7
                     })
                 });
+                
                 const data = await res.json();
-                const reply = data.choices?.[0]?.message?.content || "Maaf, aku tidak bisa memproses sekarang.";
-                addMessage(reply, false);
+                const reply = data.choices?.[0]?.message?.content;
+                addMessage(reply, 'ai');
                 speak(reply);
-            } catch (e) { 
-                addMessage("Error: " + e.message, false); 
+
+            } catch (e) {
+                addMessage("Error koneksi otak digital.", 'sys');
             }
         }
 
-        function sendText() {
-            const input = document.getElementById('textInput');
-            const text = input.value.trim();
-            if (!text) return;
-            addMessage(text, true);
-            sendToGroq(text);
-            input.value = "";
-        }
+        // Mulai dengan kamera depan saat load (opsional)
+        // window.onload = () => toggleCamera('user');
     </script>
 </body>
 </html>

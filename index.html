@@ -3,106 +3,184 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Budi - Debug Mode</title>
+    <title>Budi - Llama 4 Vision</title>
     <style>
-        body { font-family: monospace; background: #000; color: #0f0; padding: 20px; text-align: center; }
-        video { width: 100%; max-width: 500px; border: 2px solid #0f0; margin-bottom: 10px; }
-        #log { background: #111; border: 1px solid #333; height: 200px; overflow-y: auto; text-align: left; padding: 10px; font-size: 12px; color: #ccc; }
-        button { background: #0f0; color: #000; border: none; padding: 10px 20px; font-weight: bold; cursor: pointer; margin: 5px; }
-        .err { color: #ff5555; }
-        .succ { color: #00ff00; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #121212; color: #e0e0e0; text-align: center; padding: 20px; margin: 0; }
+        h1 { color: #00ffcc; text-shadow: 0 0 10px rgba(0, 255, 204, 0.5); }
+        #video { width: 100%; max-width: 640px; border-radius: 12px; border: 2px solid #333; background: #000; transform: scaleX(-1); }
+        #chat { width: 100%; max-width: 640px; height: 300px; margin: 20px auto; overflow-y: auto; background: #1e1e1e; padding: 15px; text-align: left; border-radius: 10px; border: 1px solid #333; }
+        .controls { margin: 20px 0; }
+        button { padding: 12px 24px; margin: 5px; background: #007acc; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: background 0.2s; }
+        button:hover { background: #005fa3; }
+        button:disabled { background: #555; cursor: not-allowed; }
+        input { padding: 12px; width: 70%; max-width: 400px; border-radius: 8px; border: 1px solid #444; background: #222; color: white; }
+        
+        .msg { margin: 10px 0; padding: 10px; border-radius: 8px; line-height: 1.5; }
+        .msg-user { background: #004488; color: white; text-align: right; }
+        .msg-ai { background: #2d2d2d; color: #00ffcc; border-left: 4px solid #00ffcc; }
+        .msg-error { color: #ff6b6b; font-size: 0.9em; text-align: center; }
     </style>
 </head>
 <body>
-    <h1>BUDI AI - DEBUG CONSOLE</h1>
-    <video id="vid" autoplay playsinline muted></video>
-    <br>
-    <button onclick="init()">1. Nyalakan Kamera</button>
-    <button onclick="testVision()">2. Test Lihat (Debug)</button>
+
+    <h1>Budi - Neuron Vision (Llama 4)</h1>
     
-    <div id="log">Menunggu perintah...</div>
+    <video id="video" autoplay playsinline muted></video>
+    
+    <div class="controls">
+        <button onclick="startCamera('user')">📷 Kamera Depan</button>
+        <button onclick="startCamera('environment')">🌍 Kamera Belakang</button>
+        <button onclick="captureAndAsk()" id="btnLook">👁️ Intip & Komentar</button>
+    </div>
+
+    <input type="text" id="textInput" placeholder="Ketik pesan..." onkeypress="if(event.key === 'Enter') sendText()">
+    <button onclick="sendText()">Kirim</button>
+
+    <div id="chat"></div>
 
     <script>
-        // PENTING: GANTI INI DENGAN API KEY ASLI ANDA DARI GROQ.COM
-        const API_KEY = "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"; 
+        // PENTING: Ganti dengan API Key Anda dari https://console.groq.com
+        const GROQ_API_KEY = "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"; 
         
-        // Model ID yang saat ini aktif di Groq (per Juni 2026)
-        const MODEL_ID = "llama-3.2-11b-vision-preview"; 
+        // Model Vision Terbaru yang Didukung Groq (Juni 2026)
+        const VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct";
+        const TEXT_MODEL = "llama-3.3-70b-versatile";
+        const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+        
+        let currentStream;
+        const video = document.getElementById('video');
+        const chat = document.getElementById('chat');
+        const btnLook = document.getElementById('btnLook');
 
-        const logDiv = document.getElementById('log');
-        const vid = document.getElementById('vid');
-        let stream;
-
-        function log(msg, type='') {
+        function addMessage(text, type) {
             const div = document.createElement('div');
-            div.textContent = `> ${msg}`;
-            if(type) div.className = type;
-            logDiv.appendChild(div);
-            logDiv.scrollTop = logDiv.scrollHeight;
+            div.className = `msg msg-${type}`;
+            div.textContent = text;
+            chat.appendChild(div);
+            chat.scrollTop = chat.scrollHeight;
         }
 
-        async function init() {
+        function speak(text) {
+            speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'id-ID';
+            speechSynthesis.speak(utterance);
+        }
+
+        async function startCamera(facingMode) {
+            if (currentStream) currentStream.getTracks().forEach(track => track.stop());
+            
             try {
-                stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                vid.srcObject = stream;
-                log("Kamera berhasil dinyalakan.", "succ");
-            } catch (e) {
-                log("Gagal nyalakan kamera: " + e.message, "err");
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: facingMode } 
+                });
+                currentStream = stream;
+                video.srcObject = stream;
+                video.style.transform = facingMode === 'user' ? 'scaleX(-1)' : 'scaleX(1)';
+                addMessage(`Kamera ${facingMode === 'user' ? 'depan' : 'belakang'} aktif.`, 'ai');
+            } catch (err) {
+                addMessage("Gagal akses kamera: " + err.message, 'error');
             }
         }
 
-        async function testVision() {
-            if (!stream) return log("Kamera mati! Klik tombol 1 dulu.", "err");
-            if (API_KEY.includes("XXXX")) return log("API KEY BELUM DIGANTI DI KODE!", "err");
-
-            log("Mengambil frame gambar...", "succ");
+        async function captureAndAsk() {
+            if (!video.srcObject) {
+                addMessage("Nyalakan kamera dulu!", 'error');
+                return;
+            }
             
-            // Ambil Gambar
-            const canvas = document.createElement('canvas');
-            canvas.width = vid.videoWidth;
-            canvas.height = vid.videoHeight;
-            canvas.getContext('2d').drawImage(vid, 0, 0);
-            const base64 = canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
-
-            log(`Mengirim ke Groq (Model: ${MODEL_ID})...`);
+            btnLook.disabled = true;
+            btnLook.textContent = "Sedang melihat...";
+            addMessage("Budi sedang mengamati...", 'ai');
 
             try {
-                const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth || 640;
+                canvas.height = video.videoHeight || 480;
+                const ctx = canvas.getContext('2d');
+                
+                // Flip context jika kamera depan agar tidak terbalik
+                if (video.style.transform.includes('scaleX(-1)')) {
+                    ctx.translate(canvas.width, 0);
+                    ctx.scale(-1, 1);
+                }
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                // Kompresi gambar (quality 0.6 untuk keseimbangan kecepatan & kualitas)
+                const base64 = canvas.toDataURL('image/jpeg', 0.6).split(',')[1];
+                
+                const response = await fetch(GROQ_URL, {
                     method: "POST",
                     headers: {
-                        "Authorization": `Bearer ${API_KEY}`,
+                        "Authorization": `Bearer ${GROQ_API_KEY}`,
                         "Content-Type": "application/json"
                     },
                     body: JSON.stringify({
-                        model: MODEL_ID,
+                        model: VISION_MODEL,
                         messages: [{
                             role: "user",
                             content: [
-                                { type: "text", text: "Halo, apa yang kamu lihat?" },
-                                { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64}` } }
+                                { type: "text", text: "Lihat gambar ini. Beri komentar santai dan natural seperti teman nongkrong. Apa yang kamu lihat?" },
+                                { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64}` }}
                             ]
                         }],
-                        max_tokens: 50
+                        temperature: 0.7,
+                        max_tokens: 300
                     })
                 });
 
-                const data = await res.json();
-
-                if (!res.ok) {
-                    // Tampilkan error detail dari Groq
-                    log(`ERROR API: ${data.error?.message || "Unknown Error"}`, "err");
-                    return;
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(errData.error?.message || "Error API");
                 }
 
+                const data = await response.json();
                 const reply = data.choices?.[0]?.message?.content;
+                
                 if (reply) {
-                    log(`BUDI: ${reply}`, "succ");
+                    addMessage(reply, 'ai');
+                    speak(reply);
                 } else {
-                    log("Respons kosong dari API.", "err");
+                    addMessage("Maaf, Budi tidak bisa menghasilkan jawaban.", 'error');
                 }
 
             } catch (e) {
-                log(`Error Jaringan/Code: ${e.message}`, "err");
+                console.error(e);
+                addMessage("Error: " + e.message, 'error');
+            } finally {
+                btnLook.disabled = false;
+                btnLook.textContent = "👁️ Intip & Komentar";
+            }
+        }
+
+        async function sendText() {
+            const input = document.getElementById('textInput');
+            const text = input.value.trim();
+            if (!text) return;
+            
+            addMessage(text, 'user');
+            input.value = "";
+            
+            // Untuk teks saja, gunakan model teks yang lebih cepat
+            try {
+                const res = await fetch(GROQ_URL, {
+                    method: "POST",
+                    headers: { "Authorization": `Bearer ${GROQ_API_KEY}`, "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        model: TEXT_MODEL,
+                        messages: [{ role: "user", content: text }],
+                        temperature: 0.7
+                    })
+                });
+                
+                const data = await res.json();
+                const reply = data.choices?.[0]?.message?.content;
+                if (reply) {
+                    addMessage(reply, 'ai');
+                    speak(reply);
+                }
+            } catch (e) {
+                addMessage("Error kirim teks: " + e.message, 'error');
             }
         }
     </script>
